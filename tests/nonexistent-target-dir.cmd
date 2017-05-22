@@ -4,18 +4,20 @@
 @ECHO OFF
 SETLOCAL EnableDelayedExpansion
 
-SET tempFile=%TEMP%\copyFiles-output.txt
+IF NOT DEFINED BUILD_DIR SET BUILD_DIR=..\test-paths\buildDir
+IF NOT DEFINED TARGETS_FILE SET TARGETS_FILE=..\test-paths\test.targets
+IF NOT DEFINED TARGET_DIR SET TARGET_DIR=..\test-paths\targetDir
+IF NOT DEFINED TEST_OUTPUT_FILE SET TEST_OUTPUT_FILE=%TEMP%\copyFiles-output.txt
 SET pauseAfter=%1
 
 :: Arrange/Act
 SET targetDir=nonexistent\directory
-SET targetsFile=..\test-paths\nonexistent-target.targets
-> "%targetsFile%" (
-    ECHO ^[%targetDir%^]
-    ECHO     cp doesnt\matter\file.ext
-    ECHO     rp doesnt\matter\file.ext
+> "%TARGETS_FILE%" (
+    ECHO [%TARGET_DIR%]
+    ECHO     cp cp1.txt
+    ECHO     rp rp1.txt
 )
-CALL ..\copyFiles ..\test-paths "%targetsFile%" > "%tempFile%" 2>&1
+CALL ..\copyFiles "%BUILD_DIR%" "%TARGETS_FILE%" > "%TEST_OUTPUT_FILE%" 2>&1
 
 :: Assert
 IF %ERRORLEVEL%==0 (
@@ -27,9 +29,9 @@ IF %ERRORLEVEL%==0 (
 )
 
 ECHO Script Output:
-FOR /F "usebackq delims=" %%L IN ("%tempFile%") DO ECHO.    %%L
-DEL "%tempFile%"
-DEL "%targetsFile%"
+FOR /F "usebackq delims=" %%L IN ("%TEST_OUTPUT_FILE%") DO ECHO.    %%L
+DEL "%TEST_OUTPUT_FILE%"
+DEL "%TARGETS_FILE%"
 
 :: Pause, if requested
 IF NOT DEFINED pauseAfter SET pauseAfter=true

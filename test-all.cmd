@@ -6,11 +6,17 @@ FOR /F "tokens=1,2 delims=#" %%A IN ('"prompt #$H#$E# & ECHO on & FOR %%B in (1)
 
 SET tempFile=%TEMP%\test-output.txt
 
-:: Set output colors
+:: Initialize environment
+SET pauseAfterEach=false
+
+SET BUILD_DIR=..\test-paths\buildDir
+SET TARGETS_FILE=..\test-paths\test.targets
+SET TARGET_DIR=..\test-paths\targetDir
+SET TEST_OUTPUT_FILE=%TEMP%\copyFiles-output.txt
+
 SET failColor=0C
 SET passColor=0A
 
-:: Initialize counters
 SET numRun=0
 SET numPass=0
 SET numFail=0
@@ -21,7 +27,7 @@ FOR %%T IN (*.cmd) DO (
     :: Run the test
     SET /A numRun+=1
     ECHO Running test "%%~nT"    
-    CALL "%%T" false > "%tempFile%" 2>&1
+    CALL "%%T" %pauseAfterEach% > "%tempFile%" 2>&1
     
     :: Show run result
     IF ERRORLEVEL 1 (
