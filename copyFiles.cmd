@@ -23,8 +23,9 @@
 ::     The block begins with a [heading], where the heading text is the full path to the target directory.
 ::     If a target directory does not exist, then it will be skipped with a warning.
 ::     Each file mentioned after the header will be copied to the target directory, using the following logic:
-::          "rp" or "replace" will copy the file, replacing any file of the same name already there.  If the file to copy cannot be found, then the script will break.
-::          "cp" or "copy" will copy the file, but not replace.  If the file to copy cannot be found, then it will be skipped with a warning.
+::          "rp" or "replace" will copy the file, replacing any file of the same name already there.
+::          "cp" or "copy" will copy the file, but not replace.  
+::          If the file to copy cannot be found, then it will be skipped with a warning.
 ::
 ::     Adding an indent before the file names is not necessary, but improves readability.
 ::     Multiple target directory blocks may be present in a single file.
@@ -65,10 +66,10 @@ SET noTarget=false
 FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
     SET /A lineNum+=1
     SET done=false
+    SET line=%%L
     
     :: Set next target directory
     IF !done!==false (
-        SET line=%%L
         SET path=!line:~1,-1!
         IF "!line!"=="[!path!]" (
             IF EXIST "!path!" (SET noTarget=false) ELSE SET noTarget=true
@@ -87,11 +88,11 @@ FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
     :: Copy with overwrite
     IF !done!==false (
         SET isReplace=false
-        SET values=rp repl replace
-        FOR %%v IN (%values%) DO IF %%L==%%v SET isReplace=true
+        SET values=rp replace
+        FOR %%v IN (!values!) DO IF !line!==%%v SET isReplace=true
         IF !isReplace!==true (
             IF !targetSet!==false (
-                ECHO Parsing error on line !lineNum!: A target directory must be specified before an "rp" line 1>&2
+                ECHO Parsing error on line !lineNum!: A target directory must be specified before a replace line 1>&2
                 SET exitCode=3
                 GOTO CATCH
             )
@@ -113,12 +114,13 @@ FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
     :: Copy without overwrite
     IF !done!==false (
         SET isCopy=false
-        SET values=cp cpy copy
-        FOR %%v IN (%values%) DO IF %%L==%%v SET isCopy=true
+        SET values=cp copy
+        FOR %%v IN (!values!) DO IF %%v==!line! SET isCopy=true
         IF !isCopy!==true (
             IF !targetSet!==false (
-                ECHO Parsing error on line !lineNum!: A target directory must be specified before a "cp" line
+                ECHO Parsing error on line !lineNum!: A target directory must be specified before a copy line
                 SET exitCode=3
+                ECHO HERE
                 GOTO CATCH
             )
             IF !noTarget!==false (
@@ -146,7 +148,7 @@ FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
     
     :: Show an error for unrecognized tokens
     IF !done!==false (
-        ECHO Parsing error on line !lineNum!: Unrecognized token "%%L"
+        ECHO Parsing error on line !lineNum!: Unrecognized token "!line!"
         SET exitCode=4
     )
 )
