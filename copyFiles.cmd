@@ -2,15 +2,17 @@
 ::
 :: Created by Dan Vicarel
 ::
-:: void copyToUnityProjects(string buildDir, string rootDir)
-::     'buildDir' is the full path of the build output directory, containing files to be copied.
-::     'rootDir' is the full path to directory containing user-created text files,
-::          each describing a set of files to be copied from buildDir to target directories
+:: void copyFiles(string buildDir, string targetsFilePath)
+::     
+::     "buildDir" is the full path of the build output directory, containing files to be copied.
+::     "targetsFilePath" is the full path to a file describing the set of files to be copied from
+::     buildDir to target directories
 ::
-::     The text files in rootDir will contain "directory blocks" formatted like so:
+::     The targets file (usually named something like ".copytargets") must contain
+::     target directory "blocks" formatted like so:
 ::
 ::      # A full-line comment
-::      target C:\path\to\some\direcotry
+::      [C:\path\to\some\directory]
 ::          rp something.dll
 ::          rp something.pdb
 ::          rp something.else.dll
@@ -18,124 +20,141 @@
 ::          cp another.dll
 ::          cp another.pdb    # an in-line comment
 ::
-::     Each file mentioned below a directory path will be copied to that target directory
-::          "rp" will copy and replace any file by the same name already there
-::          "cp" will copy but not replace
-::          indenting not necessary, but improves readability
-::     If a mentioned file path does not exist, then it will be skipped with a warning.
+::     The block begins with a [heading], where the heading text is the full path to the target directory.
 ::     If a target directory does not exist, then it will be skipped with a warning.
+::     Each file mentioned after the header will be copied to the target directory, using the following logic:
+::          "rp" or "replace" will copy the file, replacing any file of the same name already there.  If the file to copy cannot be found, then the script will break.
+::          "cp" or "copy" will copy the file, but not replace.  If the file to copy cannot be found, then it will be skipped with a warning.
 ::
-::     Multiple directory blocks may be present in a single file
-::     Mutliple such files may be present in rootDir
+::     Adding an indent before the file names is not necessary, but improves readability.
+::     Multiple target directory blocks may be present in a single file.
+::     If the same heading appears multiple times, then the copy operations in both blocks will be executed.
 ::
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 @ECHO OFF
 SETLOCAL EnableDelayedExpansion
-CLS
 
-SET err=0
+SET exitCode=0
 
 :: Make sure that the provided build output directory actually exists
 SET buildDir=%1
-IF NOT EXIST %buildDir% (
-    SET err=1
-    ECHO The directory containing build outputs could not be found:
-    ECHO     %buildDir%
+FOR /F "usebackq tokens=*" %%a IN ('%buildDir%') DO SET buildDir=%%~a
+IF NOT EXIST "%buildDir%" (
+    ECHO A build output directory with the following path could not be found: 1>&2
+    ECHO     %buildDir% 1>&2
+    SET exitCode=1
+    GOTO CATCH
 )
 
-:: Make sure that the provided text-file root directory actually exists
-SET rootDir=%2
-IF NOT EXIST %rootDir% (
-    SET err=2
-    ECHO The directory containinig copy config files could not be found:
-    ECHO     %rootDir%
+:: Make sure that the provided copy-targets file actually exists
+SET targetsFilePath=%2
+FOR /F "usebackq tokens=*" %%a IN ('%targetsFilePath%') DO SET targetsFilePath=%%~a
+IF NOT EXIST "%targetsFilePath%" (
+    ECHO A copy-targets file with the following path could not be found: 1>&2
+    ECHO     %targetsFilePath% 1>&2
+    SET exitCode=2
+    GOTO CATCH
 )
 
-:: Exit the script if there were any errors
-IF NOT %err%==0 EXIT /B %err%
-
-:: For each targets file in rootDir
-FOR %%T IN (%rootDir%\*.targets) DO (
-    ECHO.
-    ECHO Parsing %%~fT...
+:: Parse the copy targets file
+SET lineNum=0
+SET targetSet=false
+SET targetDir=""
+SET noTarget=false
+FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
+    SET /A lineNum+=1
+    SET done=false
     
-    SET lineNum=0
-    SET targetSet=0
-    SET targetDir=
-    SET noTarget=0
-    FOR /F "eol=# tokens=1,2 delims= " %%L IN (%%T) DO (
-        SET /A lineNum+=1        
-        SET done=0
-        
-        :: Set next target directory
-        IF !done!==0 (
-            IF %%L==target (
-                IF EXIST %%M (SET noTarget=0) ELSE SET noTarget=1
-                IF !noTarget!==1 (
-                    ECHO     Could not find %%M
-                    ECHO         Nothing copied.
-                ) ELSE (
-                    ECHO     Copying to %%M...
-                )
-                SET targetSet=1
-                SET targetDir=%%M
-                SET done=1
+    :: Set next target directory
+    IF !done!==false (
+        SET line=%%L
+        SET path=!line:~1,-1!
+        IF "!line!"=="[!path!]" (
+            IF EXIST "!path!" (SET noTarget=false) ELSE SET noTarget=true
+            IF !noTarget!==true (
+                ECHO     Could not find !path!
+                ECHO         Nothing copied.
+            ) ELSE (
+                ECHO     Copying to !path!...
             )
-        )
-        
-        :: Copy with overwrite
-        IF !done!==0 (
-            IF %%L==rp (
-                IF NOT !targetSet!==1 (
-                    ECHO Parsing error on line !lineNum!: A target directory must be specified before an "rp" line
-                    EXIT /B 3
-                )
-                IF !noTarget!==0 (
-                    IF EXIST %buildDir%\%%M (
-                        IF EXIST !targetDir!\%%M (SET msg=Replaced %%M^^!) ELSE SET msg=Copied %%M^^!
-                        COPY %buildDir%\%%M !targetDir! 1> NUL
-                    ) ELSE (
-                        SET msg=Could not find %buildDir%%%M^^!
-                    )
-                    ECHO         !msg!
-                )
-                SET done=1
-            )
-        )
-        
-        :: Copy without overwrite
-        IF !done!==0 (
-            IF %%L==cp (
-                IF NOT !targetSet!==1 (
-                    ECHO Parsing error on line !lineNum!: A target directory must be specified before a "cp" line
-                    EXIT /B 3
-                )
-                IF !noTarget!==0 (
-                    IF EXIST %buildDir%\%%M (
-                        IF EXIST !targetDir!\%%M (
-                            SET msg=Target already has %%M...
-                        ) ELSE (
-                            COPY %buildDir%\%%M !targetDir! 1> NUL
-                            SET msg=Copied %%M^^!
-                        )
-                    ) ELSE (
-                        SET msg=Could not find %buildDir%%%M^^!
-                    )
-                    ECHO         !msg!
-                )
-                SET done=1
-            )
-        )
-        
-        :: Show an error for unrecognized tokens
-        IF !done!==0 (
-            ECHO Parsing error on line !lineNum!: Unrecognized token "%%L"
-            EXIT /B 4
+            SET targetSet=true
+            SET targetDir=!path!
+            SET done=true
         )
     )
     
+    :: Copy with overwrite
+    IF !done!==false (
+        SET isReplace=false
+        SET values=rp repl replace
+        FOR %%v IN (%values%) DO IF %%L==%%v SET isReplace=true
+        IF !isReplace!==true (
+            IF !targetSet!==false (
+                ECHO Parsing error on line !lineNum!: A target directory must be specified before an "rp" line 1>&2
+                SET exitCode=3
+                GOTO CATCH
+            )
+            IF !noTarget!==false (
+                SET path=%%M
+                IF EXIST "%buildDir%\!path!" (
+                    IF EXIST "!targetDir!\!path!" (SET msg=Replaced !path!^^!) ELSE SET msg=Copied !path!^^!
+                    REM COPY "%buildDir%\!path!" "!targetDir!" 1> NUL
+                    ECHO COPYING
+                ) ELSE (
+                    SET msg=Could not find %buildDir%\!path!^^!
+                )
+                ECHO         !msg!
+            )
+            SET done=true
+        )
+    )
+    
+    :: Copy without overwrite
+    IF !done!==false (
+        SET isCopy=false
+        SET values=cp cpy copy
+        FOR %%v IN (%values%) DO IF %%L==%%v SET isCopy=true
+        IF !isCopy!==true (
+            IF !targetSet!==false (
+                ECHO Parsing error on line !lineNum!: A target directory must be specified before a "cp" line
+                SET exitCode=3
+                GOTO CATCH
+            )
+            IF !noTarget!==false (
+                SET path=%%M
+                IF EXIST "%buildDir%\!path!" (
+                    IF EXIST "!targetDir!\!path!" (
+                        SET msg=Target already has !path!
+                    ) ELSE (
+                        REM COPY "%buildDir%\!path!" "!targetDir!" 1> NUL
+                        ECHO COPYING
+                        SET msg=Copied !path!^^!
+                    )
+                ) ELSE (
+                    IF EXIST "!targetDir!\!path!" (
+                        SET msg=Could not find "%buildDir%\!path!" but it is already present in Target...
+                    ) ELSE (
+                        SET msg=Could not find %buildDir%!path!^^!
+                    )
+                )
+                ECHO         !msg!
+            )
+            SET done=true
+        )
+    )
+    
+    :: Show an error for unrecognized tokens
+    IF !done!==false (
+        ECHO Parsing error on line !lineNum!: Unrecognized token "%%L"
+        SET exitCode=4
+    )
 )
 
-ENDLOCAL
-EXIT /B 0
+GOTO FINALLY
+
+:CATCH
+GOTO FINALLY
+
+:FINALLY
+EXIT /B %exitCode%
