@@ -85,6 +85,39 @@ FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
         )
     )
     
+    :: Copy without overwrite
+    IF !done!==false (
+        SET isCopy=false
+        SET values=cp copy
+        FOR %%v IN (!values!) DO IF %%v==!line! SET isCopy=true
+        IF !isCopy!==true (
+            IF !targetSet!==false (
+                ECHO Parsing error on line !lineNum!: A target directory must be specified before a copy line
+                SET exitCode=3
+                GOTO CATCH
+            )
+            IF !noTarget!==false (
+                SET path=%%M
+                IF EXIST "%buildDir%\!path!" (
+                    IF EXIST "!targetDir!\!path!" (
+                        SET msg=Target already has "!path!", and not told to replace.
+                    ) ELSE (
+                        COPY "%buildDir%\!path!" "!targetDir!" 1> NUL
+                        SET msg=Copied "!path!"^^!
+                    )
+                ) ELSE (
+                    IF EXIST "!targetDir!\!path!" (
+                        SET msg=Could not find "%buildDir%\!path!" but it is already present in Target...
+                    ) ELSE (
+                        SET msg=Could not find "%buildDir%\!path!"^^!
+                    )
+                )
+                ECHO         !msg!
+            )
+            SET done=true
+        )
+    )
+    
     :: Copy with overwrite
     IF !done!==false (
         SET isReplace=false
@@ -99,46 +132,10 @@ FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
             IF !noTarget!==false (
                 SET path=%%M
                 IF EXIST "%buildDir%\!path!" (
-                    IF EXIST "!targetDir!\!path!" (SET msg=Replaced !path!^^!) ELSE SET msg=Copied !path!^^!
-                    REM COPY "%buildDir%\!path!" "!targetDir!" 1> NUL
-                    ECHO COPYING
+                    IF EXIST "!targetDir!\!path!" (SET msg=Replaced "!path!"^^!) ELSE SET msg=Copied "!path!" by replacement^^!
+                    COPY "%buildDir%\!path!" "!targetDir!" 1> NUL
                 ) ELSE (
-                    SET msg=Could not find %buildDir%\!path!^^!
-                )
-                ECHO         !msg!
-            )
-            SET done=true
-        )
-    )
-    
-    :: Copy without overwrite
-    IF !done!==false (
-        SET isCopy=false
-        SET values=cp copy
-        FOR %%v IN (!values!) DO IF %%v==!line! SET isCopy=true
-        IF !isCopy!==true (
-            IF !targetSet!==false (
-                ECHO Parsing error on line !lineNum!: A target directory must be specified before a copy line
-                SET exitCode=3
-                ECHO HERE
-                GOTO CATCH
-            )
-            IF !noTarget!==false (
-                SET path=%%M
-                IF EXIST "%buildDir%\!path!" (
-                    IF EXIST "!targetDir!\!path!" (
-                        SET msg=Target already has !path!
-                    ) ELSE (
-                        REM COPY "%buildDir%\!path!" "!targetDir!" 1> NUL
-                        ECHO COPYING
-                        SET msg=Copied !path!^^!
-                    )
-                ) ELSE (
-                    IF EXIST "!targetDir!\!path!" (
-                        SET msg=Could not find "%buildDir%\!path!" but it is already present in Target...
-                    ) ELSE (
-                        SET msg=Could not find %buildDir%!path!^^!
-                    )
+                    SET msg=Could not find "%buildDir%\!path!"^^!
                 )
                 ECHO         !msg!
             )
@@ -150,6 +147,7 @@ FOR /F "usebackq eol=# tokens=1,2 delims= " %%L IN ("%targetsFilePath%") DO (
     IF !done!==false (
         ECHO Parsing error on line !lineNum!: Unrecognized token "!line!"
         SET exitCode=4
+        GOTO CATCH
     )
 )
 
