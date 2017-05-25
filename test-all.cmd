@@ -32,32 +32,32 @@ FOR %%T IN (*.cmd) DO (
     :: Show run result
     IF ERRORLEVEL 1 (
         SET /A numFail+=1
-        CALL :colorText 0C FAILED && ECHO.
+        CALL :colorText 0C FAILED && ECHO=
     ) ELSE (
         SET /A numPass+=1
-        CALL :colorText 0A PASSED && ECHO.
+        CALL :colorText 0A PASSED && ECHO=
     )
     
     :: Show test outputs
     ECHO Test Output:
-    FOR /F "usebackq delims=" %%L IN ("%tempFile%") DO ECHO.    %%L
-    ECHO.
+    FOR /F "usebackq delims=" %%L IN ("%tempFile%") DO ECHO=    %%L
+    ECHO=
     ECHO ===============================================================================
-    ECHO.
+    ECHO=
 )
 DEL "%tempFile%"
 
 :: Output test run statistics
-ECHO.
+ECHO=
 IF /I %numFail% GTR 0 (
     SET colorCode=%failColor%
 ) ELSE (
     SET colorCode=%passColor%
 )
 ECHO Tests Run: %numRun%
-CALL :colorText %passColor% "%numPass% Passed" && ECHO.
-CALL :colorText %colorCode% "%numFail% Failed" && ECHO.
-ECHO.
+CALL :colorText %passColor% "%numPass% Passed" && ECHO=
+CALL :colorText %colorCode% "%numFail% Failed" && ECHO=
+ECHO=
 PAUSE
 
 EXIT /B 0
