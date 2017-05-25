@@ -23,7 +23,7 @@ SET numFail=0
 
 :: Run every Batch file in the tests directory...
 CD tests\
-FOR %%T IN (*.cmd) DO (    
+FOR /R %%T IN (*.cmd) DO (    
     :: Run the test
     SET /A numRun+=1
     ECHO Running test "%%~nT"    
