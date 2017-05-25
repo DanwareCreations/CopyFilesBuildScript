@@ -13,9 +13,9 @@ SET pauseAfter=%1
 :: Arrange/Act
 SET targetDir=nonexistent\directory
 > "%TARGETS_FILE%" (
-    ECHO [%TARGET_DIR%]
-    ECHO     cp cp1.txt
-    ECHO     rp rp1.txt
+    ECHO [%targetDir%]
+    ECHO     cp test.txt
+    ECHO     rp test.txt
 )
 CALL ..\copyFiles "%BUILD_DIR%" "%TARGETS_FILE%" > "%TEST_OUTPUT_FILE%" 2>&1
 
