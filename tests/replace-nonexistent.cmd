@@ -19,10 +19,10 @@ CALL ..\copyFiles "%BUILD_DIR%" "%TARGETS_FILE%" > "%TEST_OUTPUT_FILE%" 2>&1
 
 :: Assert
 IF %ERRORLEVEL%==0 (
-    ECHO copyFiles correctly succeeded, even though script tried to copy a nonexistent file with replacement
+    ECHO copyFiles correctly succeeded, even though script tried to copy a nonexistent file by replacement
     SET exitCode=0
 ) ELSE (
-    ECHO copyFiles should have succeeded, even though script tried to copy a nonexistent file with replacement, but it didn't^^!
+    ECHO copyFiles should have succeeded, even though script tried to copy a nonexistent file by replacement, but it didn't^^!
     SET exitCode=1
 )
 
